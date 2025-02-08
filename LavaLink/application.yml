@@ -4,21 +4,23 @@
   http2:
     enabled: false # Whether to enable HTTP/2 support
 plugins:
-#  name: # Name of the plugin
-#    some_key: some_value # Some key-value pair for the plugin
-#    another_key: another_value
+  youtube:
+    enabled: true # Whether this source can be used.
+    allowSearch: true # Whether "ytsearch:" and "ytmsearch:" can be used.
+    allowDirectVideoIds: true # Whether just video IDs can match. If false, only complete URLs will be loaded.
+    allowDirectPlaylistIds: true # Whether just playlist IDs can match. If false, only complete URLs will be loaded.
+    # The clients to use for track loading. See below for a list of valid clients.
+    # Clients are queried in the order they are given (so the first client is queried first and so on...)
+    clients:
+      - MUSIC
+      - ANDROID_VR
+      - WEB
+      - WEBEMBEDDED
 lavalink:
-  plugins:
-  #    - dependency: "com.github.example:example-plugin:1.0.0" # required, the coordinates of your plugin
-  #      repository: "https://maven.example.com/releases" # optional, defaults to the Lavalink releases repository by default
-  #      snapshot: false # optional, defaults to false, used to tell Lavalink to use the snapshot repository instead of the release repository
-  #  pluginsDir: "./plugins" # optional, defaults to "./plugins"
-  #  defaultPluginRepository: "https://maven.lavalink.dev/releases" # optional, defaults to the Lavalink release repository
-  #  defaultPluginSnapshotRepository: "https://maven.lavalink.dev/snapshots" # optional, defaults to the Lavalink snapshot repository
-  server:
+   server:
     password: "youshallnotpass"
     sources:
-      youtube: true
+      youtube: false
       bandcamp: true
       soundcloud: true
       twitch: true
