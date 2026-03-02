@@ -1,0 +1,34 @@
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: lavalink
+    restart: unless-stopped
+    volumes:
+      - ./LavaLink/application.yml:/opt/Lavalink/application.yml:ro
+      - ./LavaLink/plugins:/opt/Lavalink/plugins:ro
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2333/v4/info", "-H", "Authorization: ${LAVALINK_PASSWORD:-youshallnotpass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  bot:
+    build: .
+    container_name: cleitinrasta-bot
+    restart: unless-stopped
+    depends_on:
+      lavalink:
+        condition: service_healthy
+    environment:
+      - Discord__Token=${DISCORD_TOKEN}
+      - Lavalink__BaseAddress=http://lavalink:2333/
+      - Lavalink__Passphrase=${LAVALINK_PASSWORD:-youshallnotpass}
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
