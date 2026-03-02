@@ -14,8 +14,7 @@ var builder = Host.CreateDefaultBuilder(args)
     .UseLavalink()
     .UseApplicationCommands<SlashCommandInteraction, SlashCommandContext>()
     .UseApplicationCommands<UserCommandInteraction, UserCommandContext>()
-    .UseApplicationCommands<MessageCommandInteraction, MessageCommandContext>()
-    .UseCommands<CommandContext>();
+    .UseApplicationCommands<MessageCommandInteraction, MessageCommandContext>();
 
 var host = builder.Build()
     .AddModules(typeof(Program).Assembly)
