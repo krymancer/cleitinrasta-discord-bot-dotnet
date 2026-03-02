@@ -11,6 +11,14 @@ using Lavalink4NET.NetCord;
 
 var builder = Host.CreateDefaultBuilder(args)
     .UseDiscordGateway()
+    .ConfigureServices((context, services) =>
+    {
+        services.Configure<LavalinkSocketOptions>(options =>
+        {
+            options.BaseAddress = new Uri(context.Configuration["Lavalink:BaseAddress"] ?? "http://lavalink:2333/");
+            options.Passphrase = context.Configuration["Lavalink:Passphrase"] ?? "youshallnotpass";
+        });
+    })
     .UseLavalink()
     .UseApplicationCommands<SlashCommandInteraction, SlashCommandContext>()
     .UseApplicationCommands<UserCommandInteraction, UserCommandContext>()
