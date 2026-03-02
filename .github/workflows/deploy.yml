@@ -1,0 +1,30 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          cat > .env <<EOF
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          LAVALINK_PASSWORD=${{ secrets.LAVALINK_PASSWORD }}
+          EOF
+
+      - name: Deploy with Docker Compose
+        run: docker compose up -d --build
+
+      - name: Clean up Docker build cache
+        if: always()
+        run: |
+          docker image prune -f
+          docker builder prune -f
