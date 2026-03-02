@@ -9,7 +9,7 @@ services:
     networks:
       - bot-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2333/v4/info", "-H", "Authorization: ${LAVALINK_PASSWORD:-youshallnotpass}"]
+      test: ["CMD-SHELL", "curl -f http://localhost:2333/v4/info -H 'Authorization: $${LAVALINK_PASSWORD:-youshallnotpass}' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
