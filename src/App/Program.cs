@@ -1,10 +1,10 @@
-﻿using Lavalink4NET.InactivityTracking;
+﻿using Lavalink4NET.InactivityTracking.Extensions;
 using Lavalink4NET.InactivityTracking.Trackers.Idle;
 using Lavalink4NET.InactivityTracking.Trackers.Users;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Lavalink4NET;
+using Lavalink4NET.Extensions;
 using Lavalink4NET.NetCord;
 using NetCord;
 using NetCord.Gateway;
@@ -35,6 +35,33 @@ var builder = Host.CreateDefaultBuilder(args)
                 | GatewayIntents.GuildVoiceStates 
                 | GatewayIntents.GuildMessages 
                 | GatewayIntents.MessageContent;
+        });
+
+        // Add Lavalink
+        services.AddLavalink();
+        
+        // Add inactivity tracking
+        services.AddInactivityTracking();
+        
+        // Configure inactivity tracking options
+        services.ConfigureInactivityTracking(options =>
+        {
+            options.DefaultTimeout = TimeSpan.FromMinutes(inactivityTimeoutMinutes);
+            options.UseDefaultTrackers = true;
+        });
+        
+        // Configure idle tracker options
+        services.Configure<IdleInactivityTrackerOptions>(options =>
+        {
+            options.Timeout = TimeSpan.FromMinutes(inactivityTimeoutMinutes);
+        });
+        
+        // Configure users tracker options
+        services.Configure<UsersInactivityTrackerOptions>(options =>
+        {
+            options.Timeout = TimeSpan.FromMinutes(inactivityTimeoutMinutes);
+            options.ExcludeBots = true;
+            options.Threshold = 1;
         });
     })
     .UseLavalink(options =>
