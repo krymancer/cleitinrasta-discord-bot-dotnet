@@ -2,7 +2,10 @@
 using Lavalink4NET.Extensions;
 using Lavalink4NET.NetCord;
 using Lavalink4NET.Players;
+using Lavalink4NET.Players.Queued;
 using Lavalink4NET.Rest.Entities.Tracks;
+using NetCord;
+using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 
 namespace App.Modules;
@@ -10,33 +13,52 @@ namespace App.Modules;
 public class MusicModule(IAudioService audioService) : ApplicationCommandModule<SlashCommandContext>
 {
     [SlashCommand("play", "Plays a track!")]
-    public async Task<string> PlayAsync([SlashCommandParameter(Description = "The query to search for")] string query)
+    public async Task PlayAsync([SlashCommandParameter(Description = "The query to search for")] string query)
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        // Defer the response immediately to avoid timeout
+        await Context.Interaction.SendResponseAsync(InteractionCallback.DeferredMessage());
 
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        var tracksResult = await audioService.Tracks
-            .LoadTracksAsync(query, TrackSearchMode.YouTube);
-
-        if (tracksResult.IsPlaylist)
+        // Run the music logic off the gateway thread to avoid deadlock
+        await Task.Run(async () =>
         {
-            foreach (var track  in tracksResult.Tracks)
+            var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+
+            var result = await audioService.Players
+                .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
+
+            if (!result.IsSuccess)
             {
-                await player.PlayAsync(track);
+                await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = GetErrorMessage(result.Status) });
+                return;
             }
 
-            return $"Added {tracksResult.Tracks.Length} to the queue";
-        }
-        
-        await player.PlayAsync(tracksResult);
+            var player = result.Player;
 
-        return $"Playing: {player.CurrentTrack?.Title}";
+            var tracksResult = await audioService.Tracks
+                .LoadTracksAsync(query, TrackSearchMode.YouTube);
+
+            if (tracksResult.IsPlaylist)
+            {
+                foreach (var playlistTrack in tracksResult.Tracks)
+                {
+                    await player.Queue.AddAsync(new TrackQueueItem(playlistTrack));
+                }
+
+                await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Added {tracksResult.Tracks.Length} tracks to the queue" });
+                return;
+            }
+            
+            var track = tracksResult.Track;
+            if (track is null)
+            {
+                await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = "No tracks found." });
+                return;
+            }
+
+            await player.PlayAsync(track);
+
+            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Playing: {player.CurrentTrack?.Title}" });
+        });
     }
 
     [SlashCommand("stop", description: "Stops the current track")]
