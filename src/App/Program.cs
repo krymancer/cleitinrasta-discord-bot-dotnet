@@ -1,4 +1,8 @@
 ﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Lavalink4NET;
+using Lavalink4NET.NetCord;
 using NetCord;
 using NetCord.Gateway;
 using NetCord.Hosting.Gateway;
@@ -7,25 +11,38 @@ using NetCord.Hosting.Services.ApplicationCommands;
 using NetCord.Hosting.Services.Commands;
 using NetCord.Services.ApplicationCommands;
 using NetCord.Services.Commands;
-using Lavalink4NET.NetCord;
+
+// Build a temporary configuration to read Lavalink settings
+var tempConfig = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: false)
+    .AddEnvironmentVariables()
+    .Build();
+
+var lavalinkBaseAddress = tempConfig["Lavalink:BaseAddress"] ?? "http://localhost:2333";
+var lavalinkPassphrase = tempConfig["Lavalink:Passphrase"] ?? "youshallnotpass";
 
 var builder = Host.CreateDefaultBuilder(args)
-    .UseDiscordGateway()
     .ConfigureServices((context, services) =>
     {
-        services.Configure<LavalinkSocketOptions>(options =>
+        services.AddDiscordGateway(options =>
         {
-            options.BaseAddress = new Uri(context.Configuration["Lavalink:BaseAddress"] ?? "http://lavalink:2333/");
-            options.Passphrase = context.Configuration["Lavalink:Passphrase"] ?? "youshallnotpass";
+            options.Intents = GatewayIntents.Guilds 
+                | GatewayIntents.GuildVoiceStates 
+                | GatewayIntents.GuildMessages 
+                | GatewayIntents.MessageContent;
         });
     })
-    .UseLavalink()
+    .UseLavalink(options =>
+    {
+        options.BaseAddress = new Uri(lavalinkBaseAddress);
+        options.Passphrase = lavalinkPassphrase;
+    })
     .UseApplicationCommands<SlashCommandInteraction, SlashCommandContext>()
     .UseApplicationCommands<UserCommandInteraction, UserCommandContext>()
     .UseApplicationCommands<MessageCommandInteraction, MessageCommandContext>();
 
 var host = builder.Build()
-    .AddModules(typeof(Program).Assembly)
-    .UseGatewayEventHandlers();
+    .AddModules(typeof(Program).Assembly);
 
 await host.RunAsync();
