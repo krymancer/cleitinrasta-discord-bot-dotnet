@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="Lavalink4NET.InactivityTracking" Version="4.2.0" />
       <PackageReference Include="Lavalink4NET.Integrations.Lavasearch" Version="4.2.0" />
       <PackageReference Include="Lavalink4NET.NetCord" Version="4.2.0" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />

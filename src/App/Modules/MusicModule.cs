@@ -198,6 +198,24 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
         return "Done!";
     }
 
+    [SlashCommand("leave", description: "Disconnects the bot from the voice channel")]
+    public async Task<string> LeaveAsync()
+    {
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
+
+        var result = await audioService.Players
+            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
+
+        if (!result.IsSuccess) return GetErrorMessage(result.Status);
+
+        var player = result.Player;
+
+        // Disconnect and dispose the player
+        await player.DisconnectAsync();
+
+        return "Disconnected from voice channel.";
+    }
+
     private static string GetErrorMessage(PlayerRetrieveStatus retrieveStatus) => retrieveStatus switch
     {
         PlayerRetrieveStatus.UserNotInVoiceChannel => "You are not connected to a voice channel.",

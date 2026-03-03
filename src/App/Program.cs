@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Lavalink4NET.InactivityTracking;
+using Lavalink4NET.InactivityTracking.Trackers.Idle;
+using Lavalink4NET.InactivityTracking.Trackers.Users;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Lavalink4NET;
@@ -21,6 +24,7 @@ var tempConfig = new ConfigurationBuilder()
 
 var lavalinkBaseAddress = tempConfig["Lavalink:BaseAddress"] ?? "http://localhost:2333";
 var lavalinkPassphrase = tempConfig["Lavalink:Passphrase"] ?? "youshallnotpass";
+var inactivityTimeoutMinutes = tempConfig.GetValue<int>("Player:InactivityTimeoutMinutes", 5);
 
 var builder = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
