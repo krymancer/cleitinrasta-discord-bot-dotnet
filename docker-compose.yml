@@ -24,8 +24,6 @@ services:
         condition: service_healthy
     environment:
       - Discord__Token=${DISCORD_TOKEN}
-      - Lavalink__BaseAddress=http://lavalink:2333
-      - Lavalink__Passphrase=${LAVALINK_PASSWORD:-youshallnotpass}
     networks:
       - bot-network
 
