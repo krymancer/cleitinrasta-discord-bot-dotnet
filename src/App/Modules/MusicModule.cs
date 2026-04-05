@@ -15,50 +15,48 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
     [SlashCommand("play", "Plays a track!")]
     public async Task PlayAsync([SlashCommandParameter(Description = "The query to search for")] string query)
     {
-        // Defer the response immediately to avoid timeout
         await Context.Interaction.SendResponseAsync(InteractionCallback.DeferredMessage());
 
-        // Run the music logic off the gateway thread to avoid deadlock
-        await Task.Run(async () =>
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+
+        var result = await audioService.Players
+            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
+
+        if (!result.IsSuccess)
         {
-            var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = GetErrorMessage(result.Status) });
+            return;
+        }
 
-            var result = await audioService.Players
-                .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
+        var player = result.Player;
 
-            if (!result.IsSuccess)
+        var tracksResult = await audioService.Tracks
+            .LoadTracksAsync(query, TrackSearchMode.YouTube);
+
+        if (tracksResult.IsPlaylist)
+        {
+            foreach (var playlistTrack in tracksResult.Tracks)
             {
-                await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = GetErrorMessage(result.Status) });
-                return;
+                await player.Queue.AddAsync(new TrackQueueItem(playlistTrack));
             }
 
-            var player = result.Player;
+            if (player.CurrentTrack is null)
+                await player.SkipAsync();
 
-            var tracksResult = await audioService.Tracks
-                .LoadTracksAsync(query, TrackSearchMode.YouTube);
+            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Added {tracksResult.Tracks.Length} tracks to the queue" });
+            return;
+        }
 
-            if (tracksResult.IsPlaylist)
-            {
-                foreach (var playlistTrack in tracksResult.Tracks)
-                {
-                    await player.Queue.AddAsync(new TrackQueueItem(playlistTrack));
-                }
+        var track = tracksResult.Track;
+        if (track is null)
+        {
+            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = "No tracks found." });
+            return;
+        }
 
-                await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Added {tracksResult.Tracks.Length} tracks to the queue" });
-                return;
-            }
-            
-            var track = tracksResult.Track;
-            if (track is null)
-            {
-                await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = "No tracks found." });
-                return;
-            }
+        await player.PlayAsync(track);
 
-            await player.PlayAsync(track);
-
-            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Playing: {player.CurrentTrack?.Title}" });
-        });
+        await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Playing: {player.CurrentTrack?.Title}" });
     }
 
     [SlashCommand("stop", description: "Stops the current track")]
@@ -82,7 +80,7 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
     [SlashCommand("position", description: "Shows the track position")]
     public async Task<string> Position()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
 
         var result = await audioService.Players
             .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
@@ -99,7 +97,7 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
     [SlashCommand("pause", description: "Pauses the player.")]
     public async Task<string> PauseAsync()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
 
         var result = await audioService.Players
             .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
@@ -120,7 +118,7 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
     [SlashCommand("resume", description: "Resumes the player.")]
     public async Task<string> ResumeAsync()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
 
         var result = await audioService.Players
             .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
@@ -139,7 +137,7 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
     [SlashCommand("skip", description: "Skips the current track")]
     public async Task<string> Skip()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
 
         var result = await audioService.Players
             .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
@@ -155,14 +153,14 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
         var track = player.CurrentTrack;
 
         return track is not null
-            ? $"Skipped. Now playing: {track.Uri}"
+            ? $"Skipped. Now playing: {track.Title}"
             : "Skipped. Stopped playing because the queue is now empty.";
     }
 
     [SlashCommand("queue", description: "Show the queue")]
     public async Task<string> Queue()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
 
         var result = await audioService.Players
             .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
@@ -170,21 +168,23 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
         if (!result.IsSuccess) return GetErrorMessage(result.Status);
 
         var player = result.Player;
+
+        var lines = new List<string>();
+
+        if (player.CurrentTrack is not null)
+            lines.Add($"Now playing: {player.CurrentTrack.Title}");
 
         var queue = player.Queue.ToList();
+        for (var i = 0; i < queue.Count; i++)
+            lines.Add($"{i + 1}. {queue[i].Track?.Title}");
 
-        if (queue.Count > 0)
-        {
-            return string.Join("\n", queue.Select(x => x.Track?.Title));
-        }
-
-        return "No queue";
+        return lines.Count > 0 ? string.Join("\n", lines) : "Nothing playing and queue is empty.";
     }
 
-    [SlashCommand("shuffle", "shuffle the queue")]
+    [SlashCommand("shuffle", "Toggles shuffle mode")]
     public async Task<string> Shuffle()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
 
         var result = await audioService.Players
             .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
@@ -193,9 +193,9 @@ public class MusicModule(IAudioService audioService) : ApplicationCommandModule<
 
         var player = result.Player;
 
-        player.Shuffle = true;
+        player.Shuffle = !player.Shuffle;
 
-        return "Done!";
+        return player.Shuffle ? "Shuffle enabled." : "Shuffle disabled.";
     }
 
     [SlashCommand("leave", description: "Disconnects the bot from the voice channel")]
