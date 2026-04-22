@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lavalink
+  namespace: discord-bot
+spec:
+  selector:
+    app: lavalink
+  ports:
+    - port: 2333
+      targetPort: 2333
