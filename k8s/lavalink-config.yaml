@@ -19,8 +19,6 @@ data:
         clients:
           - MUSIC
           - ANDROID_VR
-          - WEB
-          - WEBEMBEDDED
     lavalink:
       plugins:
         - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.0"
@@ -65,3 +63,5 @@ data:
       level:
         root: INFO
         lavalink: INFO
+        dev.lavalink.youtube: DEBUG
+        com.sedmelluq.discord.lavaplayer.tools.http: DEBUG
