@@ -1,4 +1,5 @@
 ﻿using App.Configuration;
+using App.Services;
 using Lavalink4NET.InactivityTracking.Extensions;
 using Lavalink4NET.InactivityTracking.Trackers.Idle;
 using Lavalink4NET.InactivityTracking.Trackers.Users;
@@ -22,6 +23,7 @@ var builder = Host.CreateDefaultBuilder(args)
         // Bind configuration sections to strongly-typed options
         services.Configure<LavalinkOptions>(context.Configuration.GetSection(LavalinkOptions.SectionName));
         services.Configure<PlayerOptions>(context.Configuration.GetSection(PlayerOptions.SectionName));
+        services.AddSingleton<MusicQueryHistory>();
 
         services.AddDiscordGateway(options =>
         {
