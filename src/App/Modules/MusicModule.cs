@@ -1,112 +1,39 @@
 ﻿using App.Services;
 using Lavalink4NET;
-using Lavalink4NET.Extensions;
 using Lavalink4NET.NetCord;
 using Lavalink4NET.Players;
-using Lavalink4NET.Players.Queued;
-using Lavalink4NET.Rest.Entities.Tracks;
-using NetCord;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 
 namespace App.Modules;
 
-public class MusicModule(IAudioService audioService, MusicQueryHistory history) : ApplicationCommandModule<SlashCommandContext>
+public class MusicModule(
+    IAudioService audioService,
+    MusicPlaybackService playbackService,
+    MusicQueryHistory history) : ApplicationCommandModule<SlashCommandContext>
 {
     [SlashCommand("play", "Plays a track!")]
     public async Task PlayAsync([SlashCommandParameter(Description = "The query to search for")] string query)
     {
         await Context.Interaction.SendResponseAsync(InteractionCallback.DeferredMessage());
 
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.Join);
+        var message = await playbackService.PlayAsync(Context, query);
 
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess)
-        {
-            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = GetErrorMessage(result.Status) });
-            return;
-        }
-
-        var player = result.Player;
-
-        var tracksResult = await audioService.Tracks
-            .LoadTracksAsync(query, TrackSearchMode.YouTube);
-
-        if (tracksResult.IsPlaylist)
-        {
-            if (tracksResult.Tracks.Length == 0)
-            {
-                await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = "No tracks found." });
-                return;
-            }
-
-            foreach (var playlistTrack in tracksResult.Tracks)
-            {
-                await player.Queue.AddAsync(new TrackQueueItem(playlistTrack));
-            }
-
-            if (player.CurrentTrack is null)
-                await player.SkipAsync();
-
-            history.Add(query, tracksResult.Tracks[0].Title, tracksResult.Tracks.Length);
-
-            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Added {tracksResult.Tracks.Length} tracks to the queue" });
-            return;
-        }
-
-        var track = tracksResult.Track;
-        if (track is null)
-        {
-            await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = "No tracks found." });
-            return;
-        }
-
-        await player.PlayAsync(track);
-
-        history.Add(query, track.Title, 1);
-
-        await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties { Content = $"Playing: {player.CurrentTrack?.Title}" });
+        await Context.Interaction.SendFollowupMessageAsync(MusicMessageFactory.Plain(message));
     }
 
     [SlashCommand("clear", description: "Clears the queue and stops playback")]
     public async Task<string> Clear()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-        var queuedTrackCount = player.Queue.Count;
-        var hasCurrentTrack = player.CurrentTrack is not null;
-
-        if (!hasCurrentTrack && queuedTrackCount == 0)
-            return "Nothing playing and queue is already empty.";
-
-        await player.Queue.ClearAsync();
-        await player.StopAsync();
-
-        return hasCurrentTrack
-            ? $"Stopped playback and cleared {queuedTrackCount} queued track(s)."
-            : $"Cleared {queuedTrackCount} queued track(s).";
+        return await playbackService.ClearAsync(Context);
     }
 
     [SlashCommand("history", description: "Shows the last played queries")]
-    public string History()
+    public InteractionMessageProperties History()
     {
         var entries = history.GetLatest();
 
-        if (entries.Count == 0)
-            return "No play history yet.";
-
-        var lines = entries
-            .Select((entry, index) => FormatHistoryEntry(index + 1, entry));
-
-        return string.Join("\n", lines);
+        return MusicMessageFactory.History(entries);
     }
 
     [SlashCommand("stop", description: "Stops the current track")]
@@ -187,48 +114,15 @@ public class MusicModule(IAudioService audioService, MusicQueryHistory history) 
     [SlashCommand("skip", description: "Skips the current track")]
     public async Task<string> Skip()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        if (player.CurrentTrack is null) return "Nothing playing!";
-
-        await player.SkipAsync();
-
-        var track = player.CurrentTrack;
-
-        return track is not null
-            ? $"Skipped. Now playing: {track.Title}"
-            : "Skipped. Stopped playing because the queue is now empty.";
+        return await playbackService.SkipAsync(Context);
     }
 
     [SlashCommand("queue", description: "Show the queue")]
-    public async Task<string> Queue()
+    public async Task<InteractionMessageProperties> Queue()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
+        var queue = await playbackService.GetQueueAsync(Context);
 
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        var lines = new List<string>();
-
-        if (player.CurrentTrack is not null)
-            lines.Add($"Now playing: {player.CurrentTrack.Title}");
-
-        var queue = player.Queue.ToList();
-        for (var i = 0; i < queue.Count; i++)
-            lines.Add($"{i + 1}. {queue[i].Track?.Title}");
-
-        return lines.Count > 0 ? string.Join("\n", lines) : "Nothing playing and queue is empty.";
+        return MusicMessageFactory.Queue(queue);
     }
 
     [SlashCommand("shuffle", "Toggles shuffle mode")]
@@ -272,26 +166,4 @@ public class MusicModule(IAudioService audioService, MusicQueryHistory history) 
         PlayerRetrieveStatus.BotNotConnected => "The bot is currently not connected.",
         _ => "Unknown error.",
     };
-
-    private static string FormatHistoryEntry(int index, MusicQueryHistoryEntry entry)
-    {
-        var firstTrackTitle = Truncate(Compact(entry.FirstTrackTitle), 90);
-        var query = Truncate(Compact(entry.Query), 80);
-        var count = entry.TrackCount == 1 ? "1 song" : $"{entry.TrackCount} songs";
-
-        return $"{index}. {firstTrackTitle} ({count}) - query: {query}";
-    }
-
-    private static string Compact(string value) => value
-        .Replace('\r', ' ')
-        .Replace('\n', ' ')
-        .Trim();
-
-    private static string Truncate(string value, int maxLength)
-    {
-        if (value.Length <= maxLength)
-            return value;
-
-        return value[..(maxLength - 3)] + "...";
-    }
 }
