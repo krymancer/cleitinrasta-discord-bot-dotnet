@@ -13,8 +13,10 @@ using NetCord.Gateway;
 using NetCord.Hosting.Gateway;
 using NetCord.Hosting.Services;
 using NetCord.Hosting.Services.ApplicationCommands;
+using NetCord.Hosting.Services.ComponentInteractions;
 using NetCord.Hosting.Services.Commands;
 using NetCord.Services.ApplicationCommands;
+using NetCord.Services.ComponentInteractions;
 using NetCord.Services.Commands;
 
 var builder = Host.CreateDefaultBuilder(args)
@@ -24,6 +26,7 @@ var builder = Host.CreateDefaultBuilder(args)
         services.Configure<LavalinkOptions>(context.Configuration.GetSection(LavalinkOptions.SectionName));
         services.Configure<PlayerOptions>(context.Configuration.GetSection(PlayerOptions.SectionName));
         services.AddSingleton<MusicQueryHistory>();
+        services.AddSingleton<MusicPlaybackService>();
 
         services.AddDiscordGateway(options =>
         {
@@ -76,7 +79,8 @@ var builder = Host.CreateDefaultBuilder(args)
     })
     .UseApplicationCommands<SlashCommandInteraction, SlashCommandContext>()
     .UseApplicationCommands<UserCommandInteraction, UserCommandContext>()
-    .UseApplicationCommands<MessageCommandInteraction, MessageCommandContext>();
+    .UseApplicationCommands<MessageCommandInteraction, MessageCommandContext>()
+    .UseComponentInteractions<ButtonInteraction, ButtonInteractionContext>();
 
 var host = builder.Build()
     .AddModules(typeof(Program).Assembly);
