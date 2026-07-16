@@ -2,6 +2,7 @@
 using Lavalink4NET;
 using Lavalink4NET.NetCord;
 using Lavalink4NET.Players;
+using Lavalink4NET.Players.Queued;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 
@@ -123,6 +124,46 @@ public class MusicModule(
         var queue = await playbackService.GetQueueAsync(Context);
 
         return MusicMessageFactory.Queue(queue);
+    }
+
+    [SlashCommand("loop", description: "Loops the current track, or the whole queue")]
+    public async Task<string> Loop(
+        [SlashCommandParameter(Description = "What to loop (default: track)")] LoopMode? mode = null)
+    {
+        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
+
+        var result = await audioService.Players
+            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
+
+        if (!result.IsSuccess) return GetErrorMessage(result.Status);
+
+        var player = result.Player;
+
+        // No parameter: toggle track loop on/off
+        var repeatMode = mode switch
+        {
+            LoopMode.Track => TrackRepeatMode.Track,
+            LoopMode.Queue => TrackRepeatMode.Queue,
+            LoopMode.Off => TrackRepeatMode.None,
+            null => player.RepeatMode is TrackRepeatMode.Track ? TrackRepeatMode.None : TrackRepeatMode.Track,
+            _ => TrackRepeatMode.None,
+        };
+
+        player.RepeatMode = repeatMode;
+
+        return repeatMode switch
+        {
+            TrackRepeatMode.Track => "Looping current track. 🔂",
+            TrackRepeatMode.Queue => "Looping the whole queue. 🔁",
+            _ => "Loop disabled.",
+        };
+    }
+
+    public enum LoopMode
+    {
+        Track,
+        Queue,
+        Off,
     }
 
     [SlashCommand("shuffle", "Toggles shuffle mode")]
