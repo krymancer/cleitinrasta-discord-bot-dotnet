@@ -19,6 +19,10 @@ data:
         oauth:
           enabled: true
           refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
+        remoteCipher:
+          url: "https://cipher.kikkia.dev"
+          password: ""
+          userAgent: "cleitinrasta"
         clients:
           - MUSIC
           - TV
