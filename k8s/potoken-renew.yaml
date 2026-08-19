@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bgutil-pot-provider
+  namespace: discord-bot
+  labels:
+    app: bgutil-pot-provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bgutil-pot-provider
+  template:
+    metadata:
+      labels:
+        app: bgutil-pot-provider
+    spec:
+      containers:
+        - name: provider
+          image: brainicism/bgutil-ytdlp-pot-provider:latest
+          ports:
+            - containerPort: 4416
+          readinessProbe:
+            tcpSocket:
+              port: 4416
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 768Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bgutil-pot-provider
+  namespace: discord-bot
+spec:
+  selector:
+    app: bgutil-pot-provider
+  ports:
+    - port: 4416
+      targetPort: 4416
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: potoken-renewer
+  namespace: discord-bot
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: potoken-renewer
+  namespace: discord-bot
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "patch", "update"]
+    resourceNames: ["lavalink-pot"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+    resourceNames: ["lavalink"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: potoken-renewer
+  namespace: discord-bot
+subjects:
+  - kind: ServiceAccount
+    name: potoken-renewer
+    namespace: discord-bot
+roleRef:
+  kind: Role
+  name: potoken-renewer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: potoken-renew
+  namespace: discord-bot
+spec:
+  # poToken lives ~6h; renew every 4h for headroom
+  schedule: "0 */4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: potoken-renewer
+          restartPolicy: OnFailure
+          containers:
+            - name: renew
+              image: alpine/k8s:1.30.0
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+
+                  UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+
+                  echo "[1/4] fetching visitorData from youtube.com"
+                  VD_RAW=$(curl -sf --max-time 30 'https://www.youtube.com/' -H "User-Agent: $UA" \
+                    | grep -oE '"visitorData":"[^"]+"' | head -1 | sed 's/"visitorData":"//; s/"$//')
+                  if [ -z "$VD_RAW" ]; then echo "ERROR: could not extract visitorData"; exit 1; fi
+                  # value is percent-encoded in the page source
+                  VD=$(printf '%b' "${VD_RAW//%/\\x}")
+                  echo "    visitorData length: ${#VD}"
+
+                  echo "[2/4] requesting poToken bound to that visitorData"
+                  POT=$(curl -sf --max-time 120 -X POST \
+                    "http://bgutil-pot-provider.discord-bot.svc.cluster.local:4416/get_pot" \
+                    -H 'Content-Type: application/json' \
+                    -d "{\"content_binding\":\"$VD\"}" | jq -r '.poToken')
+                  if [ -z "$POT" ] || [ "$POT" = "null" ]; then echo "ERROR: provider returned no poToken"; exit 1; fi
+                  echo "    poToken length: ${#POT}"
+
+                  echo "[3/4] patching secret lavalink-pot"
+                  kubectl create secret generic lavalink-pot -n discord-bot \
+                    --from-literal=POTOKEN="$POT" \
+                    --from-literal=VISITORDATA="$VD" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+
+                  echo "[4/4] restarting lavalink to pick up new env"
+                  kubectl rollout restart deployment/lavalink -n discord-bot
+
+                  echo "poToken renewed successfully"
+              resources:
+                requests:
+                  memory: 64Mi
+                  cpu: 50m
+                limits:
+                  memory: 256Mi
+                  cpu: 200m
