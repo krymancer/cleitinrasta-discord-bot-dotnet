@@ -26,6 +26,16 @@ spec:
                 secretKeyRef:
                   name: lavalink-oauth
                   key: refreshToken
+            - name: YOUTUBE_POTOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: lavalink-pot
+                  key: POTOKEN
+            - name: YOUTUBE_VISITORDATA
+              valueFrom:
+                secretKeyRef:
+                  name: lavalink-pot
+                  key: VISITORDATA
           volumeMounts:
             - name: config
               mountPath: /opt/Lavalink/application.yml

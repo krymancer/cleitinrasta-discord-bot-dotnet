@@ -23,6 +23,9 @@ data:
           url: "https://cipher.kikkia.dev"
           password: ""
           userAgent: "cleitinrasta"
+        pot:
+          token: "${YOUTUBE_POTOKEN}"
+          visitorData: "${YOUTUBE_VISITORDATA}"
         clients:
           - MUSIC
           - WEB
