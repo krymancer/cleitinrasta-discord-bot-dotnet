@@ -112,8 +112,10 @@ spec:
                   UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
                   echo "[1/4] fetching visitorData from youtube.com"
-                  VD_RAW=$(curl -sf --max-time 30 'https://www.youtube.com/' -H "User-Agent: $UA" \
-                    | grep -oE '"visitorData":"[^"]+"' | head -1 | sed 's/"visitorData":"//; s/"$//')
+                  # NOTE: no `| head -1` inside a pipefail pipeline - head exits early,
+                  # curl gets SIGPIPE and the whole job dies with exit 141.
+                  YTHTML=$(curl -sf --max-time 30 'https://www.youtube.com/' -H "User-Agent: $UA")
+                  VD_RAW=$(printf '%s' "$YTHTML" | grep -oE '"visitorData":"[^"]+"' | sed -n '1s/"visitorData":"//; 1s/"$//p')
                   if [ -z "$VD_RAW" ]; then echo "ERROR: could not extract visitorData"; exit 1; fi
                   # value is percent-encoded in the page source
                   VD=$(printf '%b' "${VD_RAW//%/\\x}")
