@@ -65,6 +65,9 @@ rules:
     resources: ["deployments"]
     verbs: ["get", "patch"]
     resourceNames: ["lavalink"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -131,7 +134,8 @@ spec:
                     --dry-run=client -o yaml | kubectl apply -f -
 
                   echo "[4/4] restarting lavalink to pick up new env"
-                  kubectl rollout restart deployment/lavalink -n discord-bot
+                  kubectl patch deployment/lavalink -n discord-bot --type=merge \
+                    -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"potoken/restartedAt\":\"$(date -u +%FT%TZ)\"}}}}}"
 
                   echo "poToken renewed successfully"
               resources:
