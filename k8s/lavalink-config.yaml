@@ -18,10 +18,15 @@ data:
         allowDirectPlaylistIds: true
         clients:
           - MUSIC
+          - TVHTML5_SIMPLY
+          - MWEB
+          - WEBEMBEDDED
+          - WEB
+          - ANDROID_MUSIC
           - ANDROID_VR
     lavalink:
       plugins:
-        - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.0"
+        - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
           repository: "https://maven.lavalink.dev/releases"
       server:
         password: "youshallnotpass"
