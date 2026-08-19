@@ -25,11 +25,11 @@ data:
           userAgent: "cleitinrasta"
         clients:
           - MUSIC
+          - WEB
+          - MWEB
           - TV
           - TVHTML5_SIMPLY
-          - MWEB
           - WEBEMBEDDED
-          - WEB
           - ANDROID_MUSIC
           - ANDROID_VR
     lavalink:
