@@ -16,6 +16,8 @@ data:
         allowSearch: true
         allowDirectVideoIds: true
         allowDirectPlaylistIds: true
+        oauth:
+          enabled: true
         clients:
           - MUSIC
           - TVHTML5_SIMPLY
