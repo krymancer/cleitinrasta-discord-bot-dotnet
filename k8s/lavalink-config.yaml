@@ -18,8 +18,10 @@ data:
         allowDirectPlaylistIds: true
         oauth:
           enabled: true
+          refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
         clients:
           - MUSIC
+          - TV
           - TVHTML5_SIMPLY
           - MWEB
           - WEBEMBEDDED

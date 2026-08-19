@@ -20,6 +20,12 @@ spec:
           image: ghcr.io/lavalink-devs/lavalink:4
           ports:
             - containerPort: 2333
+          env:
+            - name: YOUTUBE_OAUTH_REFRESH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: lavalink-oauth
+                  key: refreshToken
           volumeMounts:
             - name: config
               mountPath: /opt/Lavalink/application.yml
