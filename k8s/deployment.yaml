@@ -15,6 +15,43 @@ spec:
       labels:
         app: lavalink
     spec:
+      initContainers:
+        # Official Lavalink image + this JAR (PR 229). Checksum pins the vendored file.
+        - name: fetch-youtube-plugin
+          image: alpine:3.20
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              apk add --no-cache curl
+              curl -fsSL -o /plugins/youtube-plugin.jar "$PLUGIN_URL"
+              chmod 644 /plugins/youtube-plugin.jar
+              echo "$PLUGIN_SHA256  /plugins/youtube-plugin.jar" | sha256sum -c
+          env:
+            - name: PLUGIN_URL
+              value: "https://raw.githubusercontent.com/krymancer/cleitinrasta-discord-bot-dotnet/main/third_party/youtube-plugin-pr229-42cc5a2.jar"
+            - name: PLUGIN_SHA256
+              value: "5956638abc420d9efc32b11c70168da5dda7a71d2df02c7f688e9770e7738bc7"
+          volumeMounts:
+            - name: plugins
+              mountPath: /plugins
+        - name: wait-webpo
+          image: alpine:3.20
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              apk add --no-cache curl
+              i=0
+              until curl -fsS http://webpo-generator.discord-bot.svc.cluster.local:8080/health; do
+                i=$((i + 1))
+                if [ "$i" -gt 80 ]; then
+                  echo "timeout waiting for webpo-generator"
+                  exit 1
+                fi
+                echo "waiting for webpo-generator ($i)"
+                sleep 3
+              done
       containers:
         - name: lavalink
           image: ghcr.io/lavalink-devs/lavalink:4
@@ -26,21 +63,13 @@ spec:
                 secretKeyRef:
                   name: lavalink-oauth
                   key: refreshToken
-            - name: YOUTUBE_POTOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: lavalink-pot
-                  key: POTOKEN
-            - name: YOUTUBE_VISITORDATA
-              valueFrom:
-                secretKeyRef:
-                  name: lavalink-pot
-                  key: VISITORDATA
           volumeMounts:
             - name: config
               mountPath: /opt/Lavalink/application.yml
               subPath: application.yml
               readOnly: true
+            - name: plugins
+              mountPath: /opt/Lavalink/plugins
           readinessProbe:
             tcpSocket:
               port: 2333
@@ -57,6 +86,8 @@ spec:
         - name: config
           configMap:
             name: lavalink-config
+        - name: plugins
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment

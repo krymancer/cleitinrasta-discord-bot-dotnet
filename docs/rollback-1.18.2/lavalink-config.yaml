@@ -18,31 +18,27 @@ data:
         allowDirectPlaylistIds: true
         oauth:
           enabled: true
-          # TV tries without OAuth first, then retries with the refresh token.
-          fallback: true
           refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
         remoteCipher:
           url: "https://cipher.kikkia.dev"
           password: ""
           userAgent: "cleitinrasta"
-        # PR 229: mint a per-video / GVS PoToken. The static pot.token +
-        # visitorData pair from 1.18.2 is gone on this plugin.
-        remotePot:
-          url: "http://webpo-generator.discord-bot.svc.cluster.local:8080"
+        pot:
+          token: "${YOUTUBE_POTOKEN}"
+          visitorData: "${YOUTUBE_VISITORDATA}"
         clients:
           - MUSIC
-          - MWEB
           - WEB
-          - WEBEMBEDDED
-          - TVHTML5_SIMPLY
+          - MWEB
           - TV
+          - TVHTML5_SIMPLY
+          - WEBEMBEDDED
+          - ANDROID_MUSIC
+          - ANDROID_VR
     lavalink:
-      # Plugin JAR is loaded from /opt/Lavalink/plugins (initContainer).
-      # Do not also pull 1.18.2 from Maven — two youtube-plugins will conflict.
-      # Rollback to 1.18.2: see docs/youtube-playback.md (one-step git revert) or restore:
-      #   plugins:
-      #     - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
-      #       repository: "https://maven.lavalink.dev/releases"
+      plugins:
+        - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
+          repository: "https://maven.lavalink.dev/releases"
       server:
         password: "youshallnotpass"
         sources:
