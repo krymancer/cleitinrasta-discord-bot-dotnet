@@ -1,0 +1,81 @@
+# Companion to youtube-source PR 229. Mints per-video / GVS PoTokens.
+# Uses the public node image plus a pinned upstream tarball so Argo can
+# sync this path without waiting on a new GHCR package. CI also publishes
+# ghcr.io/krymancer/cleitinrasta-webpo-generator:yt-pr229 (same Dockerfile)
+# if you want to switch the image later for faster starts.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webpo-generator
+  namespace: discord-bot
+  labels:
+    app: webpo-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webpo-generator
+  template:
+    metadata:
+      labels:
+        app: webpo-generator
+    spec:
+      containers:
+        - name: webpo
+          image: node:24-bookworm-slim
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "8080"
+            - name: WEBPO_SHA
+              value: "ca301fd89d2bcbe3bbe423d5fd3deba9b337d75a"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              apt-get update
+              apt-get install -y --no-install-recommends ca-certificates curl
+              mkdir -p /app
+              cd /app
+              curl -fsSL "https://github.com/ashton045/webpo-generator/archive/${WEBPO_SHA}.tar.gz" | tar xz --strip-components=1
+              npm ci --omit=dev
+              exec node server.js
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 768Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webpo-generator
+  namespace: discord-bot
+spec:
+  selector:
+    app: webpo-generator
+  ports:
+    - port: 8080
+      targetPort: 8080
