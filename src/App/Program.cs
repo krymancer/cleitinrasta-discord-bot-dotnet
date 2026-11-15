@@ -27,6 +27,8 @@ var builder = Host.CreateDefaultBuilder(args)
         services.Configure<PlayerOptions>(context.Configuration.GetSection(PlayerOptions.SectionName));
         services.AddSingleton<MusicQueryHistory>();
         services.AddSingleton<MusicPlaybackService>();
+        services.Configure<MeetOptions>(context.Configuration.GetSection(MeetOptions.SectionName));
+        services.AddSingleton<MeetingService>();
 
         services.AddDiscordGateway(options =>
         {

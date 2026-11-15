@@ -17,3 +17,7 @@ Para poder utilizar o bot é necessário editar o arquivo `appsettings.json` na 
   }
 }
 ```
+
+## Compartilhar tela (`/live`)
+
+O comando `/live` cria uma sala de videochamada (Google Meet ou Jitsi) e manda o link no canal. Veja [docs/live-command.md](docs/live-command.md) para configurar o Google Meet.

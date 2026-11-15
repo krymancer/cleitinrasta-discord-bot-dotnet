@@ -45,6 +45,9 @@ services:
         condition: service_healthy
     environment:
       - Discord__Token=${DISCORD_TOKEN}
+      - GoogleMeet__ClientId=${GOOGLE_MEET_CLIENT_ID:-}
+      - GoogleMeet__ClientSecret=${GOOGLE_MEET_CLIENT_SECRET:-}
+      - GoogleMeet__RefreshToken=${GOOGLE_MEET_REFRESH_TOKEN:-}
     networks:
       - bot-network
     healthcheck:

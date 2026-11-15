@@ -116,6 +116,24 @@ spec:
                 secretKeyRef:
                   name: discord-bot-secret
                   key: DISCORD_TOKEN
+            - name: GoogleMeet__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: GOOGLE_MEET_CLIENT_ID
+                  optional: true
+            - name: GoogleMeet__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: GOOGLE_MEET_CLIENT_SECRET
+                  optional: true
+            - name: GoogleMeet__RefreshToken
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: GOOGLE_MEET_REFRESH_TOKEN
+                  optional: true
           resources:
             requests:
               memory: 128Mi
