@@ -16,8 +16,8 @@ loaded it. Playback still 403’d. This is not an expired token or a dead CronJo
 ## What this change does
 
 1. Loads the unreleased [youtube-source PR 229](https://github.com/lavalink-devs/youtube-source/pull/229)
-   plugin JAR (`third_party/youtube-plugin-pr229-42cc5a2.jar`, built from
-   `42cc5a2042f31dba3fdc523618ef380a1a8bb79d` with `./gradlew :plugin:build -x test`)
+   plugin JAR (`third_party/youtube-plugin-pr229-1ddb648.jar`, built from
+   `1ddb648257d5b547aa1e2dfb8104edf6cb1089be` with `./gradlew :plugin:build -x test`)
    into official `ghcr.io/lavalink-devs/lavalink:4` via an initContainer.
 2. Runs [webpo-generator](https://github.com/ashton045/webpo-generator)
    (`ca301fd`) so Lavalink can `POST /generate` a token bound to each video id.
@@ -32,7 +32,7 @@ Logs showed `Generating remote pot for content binding: dQw4w9WgXcQ`.
 
 ## Deploy via Argo
 
-1. Merge to `main` so `third_party/youtube-plugin-pr229-42cc5a2.jar` is
+1. Merge to `main` so `third_party/youtube-plugin-pr229-1ddb648.jar` is
    fetchable from GitHub raw (the Lavalink initContainer URL points at `main`).
 2. Sync Argo app **`discord-bot`** (path `k8s`, dest `main`). Enable **prune**
    so `bgutil-pot-provider` / `potoken-renew` / `potoken-renewer` go away.
@@ -77,3 +77,15 @@ git push origin main
 ```
 
 Snapshots of the 1.18.2 manifests live in `docs/rollback-1.18.2/`.
+
+## Music stops ~60s into a track (fixed 2026-11-25)
+
+On plugin `42cc5a2`, `WEB` (and `TV`) stream via SABR. The server keeps
+answering `SABR attestation pending`, then closes the stream (`EOFException`)
+about 55–60s in. The fallback clients then fail too, because playback has
+passed the retry threshold, so the track just ends.
+
+Fix: plugin bumped to PR 229 head `1ddb648`, where `WEB_EMBEDDED_PLAYER`
+mints a visitor-bound PoToken and gets a direct (non-SABR) URL. `WEBEMBEDDED`
+now comes first in `clients`. A local full-decode test on `1ddb648` played
+4/4 videos end to end on `WEBEMBEDDED`; `WEB` and `TV` still stopped at 60s.

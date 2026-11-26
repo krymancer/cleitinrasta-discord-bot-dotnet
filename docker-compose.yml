@@ -26,7 +26,7 @@ services:
         condition: service_healthy
     volumes:
       - ./LavaLink/application.yml:/opt/Lavalink/application.yml:ro
-      - ./third_party/youtube-plugin-pr229-42cc5a2.jar:/opt/Lavalink/plugins/youtube-plugin.jar:ro
+      - ./third_party/youtube-plugin-pr229-1ddb648.jar:/opt/Lavalink/plugins/youtube-plugin.jar:ro
     networks:
       - bot-network
     healthcheck:

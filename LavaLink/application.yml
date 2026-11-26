@@ -15,11 +15,12 @@ plugins:
       userAgent: "cleitinrasta-local"
     remotePot:
       url: "http://webpo:8080"
+    # WEBEMBEDDED first: WEB / MWEB / TV use SABR and stop ~60s in.
     clients:
+      - WEBEMBEDDED
       - MUSIC
       - MWEB
       - WEB
-      - WEBEMBEDDED
       - TVHTML5_SIMPLY
       - TV
 lavalink:
