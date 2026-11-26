@@ -213,6 +213,9 @@ public sealed class PlayerSessionService : BackgroundService
         {
             var position = TimeSpan.FromMilliseconds(snapshot.PositionMs);
             var startAt = current.Track!.IsSeekable && position < current.Track.Duration ? position : (TimeSpan?)null;
+            if (startAt is not null)
+                player.MarkNextStartAsMidTrack();
+
             await player.PlayAsync(current, enqueue: false, new TrackPlayProperties(StartPosition: startAt), cancellationToken);
 
             if (snapshot.Paused)

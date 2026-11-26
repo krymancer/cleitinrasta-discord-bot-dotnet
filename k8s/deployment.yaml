@@ -150,6 +150,19 @@ spec:
                   name: discord-bot-secret
                   key: GOOGLE_MEET_REFRESH_TOKEN
                   optional: true
+            # Optional: channel / user to report playback problems to.
+            - name: Alerts__ChannelId
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: ALERTS_CHANNEL_ID
+                  optional: true
+            - name: Alerts__UserId
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: ALERTS_USER_ID
+                  optional: true
           volumeMounts:
             # History, saved playlists and the queue snapshot used to resume after restarts.
             - name: data

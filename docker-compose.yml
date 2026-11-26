@@ -53,6 +53,8 @@ services:
       - GoogleMeet__ClientId=${GOOGLE_MEET_CLIENT_ID:-}
       - GoogleMeet__ClientSecret=${GOOGLE_MEET_CLIENT_SECRET:-}
       - GoogleMeet__RefreshToken=${GOOGLE_MEET_REFRESH_TOKEN:-}
+      - Alerts__ChannelId=${ALERTS_CHANNEL_ID:-0}
+      - Alerts__UserId=${ALERTS_USER_ID:-0}
     volumes:
       # History, saved playlists and the queue snapshot used to resume after restarts.
       - bot-data:/app/data

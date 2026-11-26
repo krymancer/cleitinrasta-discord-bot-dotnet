@@ -34,6 +34,10 @@ var builder = Host.CreateDefaultBuilder(args)
         services.AddSingleton<MusicQueryHistory>();
         services.AddSingleton<MusicPlaybackService>();
         services.AddSingleton<AutoplayService>();
+        services.Configure<AlertOptions>(context.Configuration.GetSection(AlertOptions.SectionName));
+        services.AddSingleton<AlertService>();
+        services.AddSingleton<HealthMonitor>();
+        services.AddHostedService(provider => provider.GetRequiredService<HealthMonitor>());
         services.AddSingleton<NowPlayingPanel>();
         services.AddHostedService<NowPlayingRefresher>();
         services.Configure<MeetOptions>(context.Configuration.GetSection(MeetOptions.SectionName));
