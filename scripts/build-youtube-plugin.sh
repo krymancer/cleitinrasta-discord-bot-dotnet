@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Rebuild third_party/youtube-plugin-pr229-42cc5a2.jar from youtube-source PR 229.
+# Rebuild third_party/youtube-plugin-pr229-1ddb648.jar from youtube-source PR 229.
 set -euo pipefail
 
-SHA="${YOUTUBE_SOURCE_SHA:-42cc5a2042f31dba3fdc523618ef380a1a8bb79d}"
-DEST="$(cd "$(dirname "$0")/.." && pwd)/third_party/youtube-plugin-pr229-42cc5a2.jar"
+SHA="${YOUTUBE_SOURCE_SHA:-1ddb648257d5b547aa1e2dfb8104edf6cb1089be}"
+DEST="$(cd "$(dirname "$0")/.." && pwd)/third_party/youtube-plugin-pr229-1ddb648.jar"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 

@@ -4,4 +4,4 @@
 # package is not required for rollback to ghcr.io/lavalink-devs/lavalink:4.
 FROM ghcr.io/lavalink-devs/lavalink:4
 
-COPY third_party/youtube-plugin-pr229-42cc5a2.jar /opt/Lavalink/plugins/youtube-plugin.jar
+COPY third_party/youtube-plugin-pr229-1ddb648.jar /opt/Lavalink/plugins/youtube-plugin.jar

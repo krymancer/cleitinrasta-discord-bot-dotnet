@@ -29,9 +29,9 @@ spec:
               echo "$PLUGIN_SHA256  /plugins/youtube-plugin.jar" | sha256sum -c
           env:
             - name: PLUGIN_URL
-              value: "https://raw.githubusercontent.com/krymancer/cleitinrasta-discord-bot-dotnet/main/third_party/youtube-plugin-pr229-42cc5a2.jar"
+              value: "https://raw.githubusercontent.com/krymancer/cleitinrasta-discord-bot-dotnet/main/third_party/youtube-plugin-pr229-1ddb648.jar"
             - name: PLUGIN_SHA256
-              value: "5956638abc420d9efc32b11c70168da5dda7a71d2df02c7f688e9770e7738bc7"
+              value: "1ea08818f77c9ed4a9a9d272f3fa7b4e762055fdc269b0faff29c434c1f9c95d"
           volumeMounts:
             - name: plugins
               mountPath: /plugins

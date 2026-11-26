@@ -18,8 +18,6 @@ data:
         allowDirectPlaylistIds: true
         oauth:
           enabled: true
-          # TV tries without OAuth first, then retries with the refresh token.
-          fallback: true
           refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
         remoteCipher:
           url: "https://cipher.kikkia.dev"
@@ -29,11 +27,15 @@ data:
         # visitorData pair from 1.18.2 is gone on this plugin.
         remotePot:
           url: "http://webpo-generator.discord-bot.svc.cluster.local:8080"
+        # WEBEMBEDDED first: it gets a direct googlevideo URL and plays the
+        # whole track. WEB / MWEB / TV fall into SABR streams whose attestation
+        # never completes, so they cut out ~60s in (the "music stops" bug).
+        # Clients that cannot play are skipped; search still uses MUSIC/WEB.
         clients:
+          - WEBEMBEDDED
           - MUSIC
           - MWEB
           - WEB
-          - WEBEMBEDDED
           - TVHTML5_SIMPLY
           - TV
     lavalink:
