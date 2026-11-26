@@ -11,6 +11,7 @@
       <PackageReference Include="Lavalink4NET.InactivityTracking" Version="4.2.0" />
       <PackageReference Include="Lavalink4NET.Integrations.Lavasearch" Version="4.2.0" />
       <PackageReference Include="Lavalink4NET.NetCord" Version="4.2.0" />
+      <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
       <PackageReference Include="NetCord" Version="1.0.0-alpha.469" />
       <PackageReference Include="NetCord.Hosting" Version="1.0.0-alpha.469" />

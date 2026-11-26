@@ -111,6 +111,9 @@ metadata:
     app: discord-bot
 spec:
   replicas: 1
+  # The SQLite volume is ReadWriteOnce: stop the old pod before starting the new one.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: discord-bot
@@ -147,6 +150,10 @@ spec:
                   name: discord-bot-secret
                   key: GOOGLE_MEET_REFRESH_TOKEN
                   optional: true
+          volumeMounts:
+            # History, saved playlists and the queue snapshot used to resume after restarts.
+            - name: data
+              mountPath: /app/data
           resources:
             requests:
               memory: 128Mi
@@ -154,3 +161,7 @@ spec:
             limits:
               memory: 256Mi
               cpu: 250m
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: discord-bot-data

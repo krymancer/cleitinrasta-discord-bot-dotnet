@@ -1,45 +1,97 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace App.Services;
 
-public sealed class MusicQueryHistory
+/// <summary>Play history stored in SQLite so it survives restarts.</summary>
+public sealed class MusicQueryHistory(BotDatabase database)
 {
-    private const int MaxEntries = 5;
-    private readonly List<MusicQueryHistoryEntry> _entries = new();
-    private readonly object _syncRoot = new();
-    private long _nextId;
+    private const int MaxStoredEntries = 500;
 
     public MusicQueryHistoryEntry Add(string query, string firstTrackTitle, int trackCount)
     {
-        lock (_syncRoot)
+        using var connection = database.Open();
+        using var transaction = connection.BeginTransaction();
+
+        // Replaying the same query moves it to the top instead of duplicating it.
+        using (var delete = connection.CreateCommand())
         {
-            var entry = new MusicQueryHistoryEntry(++_nextId, query, firstTrackTitle, trackCount);
-
-            _entries.Insert(0, entry);
-
-            if (_entries.Count > MaxEntries)
-                _entries.RemoveRange(MaxEntries, _entries.Count - MaxEntries);
-
-            return entry;
+            delete.CommandText = "DELETE FROM play_history WHERE query = $query";
+            delete.Parameters.AddWithValue("$query", query);
+            delete.ExecuteNonQuery();
         }
+
+        long id;
+        using (var insert = connection.CreateCommand())
+        {
+            insert.CommandText = """
+                INSERT INTO play_history (query, title, track_count, played_at)
+                VALUES ($query, $title, $count, $playedAt)
+                RETURNING id
+                """;
+            insert.Parameters.AddWithValue("$query", query);
+            insert.Parameters.AddWithValue("$title", firstTrackTitle);
+            insert.Parameters.AddWithValue("$count", trackCount);
+            insert.Parameters.AddWithValue("$playedAt", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            id = (long)insert.ExecuteScalar()!;
+        }
+
+        using (var trim = connection.CreateCommand())
+        {
+            trim.CommandText = """
+                DELETE FROM play_history WHERE id NOT IN (
+                    SELECT id FROM play_history ORDER BY id DESC LIMIT $max)
+                """;
+            trim.Parameters.AddWithValue("$max", MaxStoredEntries);
+            trim.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return new MusicQueryHistoryEntry(id, query, firstTrackTitle, trackCount);
     }
 
-    public IReadOnlyList<MusicQueryHistoryEntry> GetLatest()
-    {
-        lock (_syncRoot)
-        {
-            return _entries.ToArray();
-        }
-    }
+    /// <summary>Most recent entries first.</summary>
+    public IReadOnlyList<MusicQueryHistoryEntry> GetLatest(int count = 5) =>
+        Query("SELECT id, query, title, track_count FROM play_history ORDER BY id DESC LIMIT $limit",
+            ("$limit", count));
+
+    /// <summary>Recent entries whose title or query contains <paramref name="text"/>.</summary>
+    public IReadOnlyList<MusicQueryHistoryEntry> Search(string text, int count = 5) =>
+        Query("""
+            SELECT id, query, title, track_count FROM play_history
+            WHERE title LIKE $pattern ESCAPE '\' OR query LIKE $pattern ESCAPE '\'
+            ORDER BY id DESC LIMIT $limit
+            """,
+            ("$pattern", "%" + EscapeLike(text) + "%"),
+            ("$limit", count));
 
     public bool TryGet(long id, [NotNullWhen(true)] out MusicQueryHistoryEntry? entry)
     {
-        lock (_syncRoot)
-        {
-            entry = _entries.FirstOrDefault(entry => entry.Id == id);
-            return entry is not null;
-        }
+        entry = Query("SELECT id, query, title, track_count FROM play_history WHERE id = $id", ("$id", id))
+            .FirstOrDefault();
+        return entry is not null;
     }
+
+    private IReadOnlyList<MusicQueryHistoryEntry> Query(string sql, params (string Name, object Value)[] parameters)
+    {
+        using var connection = database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (name, value) in parameters)
+            command.Parameters.AddWithValue(name, value);
+
+        using var reader = command.ExecuteReader();
+        var entries = new List<MusicQueryHistoryEntry>();
+        while (reader.Read())
+            entries.Add(new MusicQueryHistoryEntry(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3)));
+
+        return entries;
+    }
+
+    private static string EscapeLike(string text) => text
+        .Replace("\\", "\\\\")
+        .Replace("%", "\\%")
+        .Replace("_", "\\_");
 }
 
 public sealed record MusicQueryHistoryEntry(long Id, string Query, string FirstTrackTitle, int TrackCount);

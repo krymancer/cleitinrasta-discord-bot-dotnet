@@ -53,6 +53,9 @@ services:
       - GoogleMeet__ClientId=${GOOGLE_MEET_CLIENT_ID:-}
       - GoogleMeet__ClientSecret=${GOOGLE_MEET_CLIENT_SECRET:-}
       - GoogleMeet__RefreshToken=${GOOGLE_MEET_REFRESH_TOKEN:-}
+    volumes:
+      # History, saved playlists and the queue snapshot used to resume after restarts.
+      - bot-data:/app/data
     networks:
       - bot-network
     healthcheck:
@@ -61,6 +64,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+volumes:
+  bot-data:
 
 networks:
   bot-network:
