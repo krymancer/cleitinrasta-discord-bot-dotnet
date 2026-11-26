@@ -63,6 +63,19 @@ spec:
                 secretKeyRef:
                   name: lavalink-oauth
                   key: refreshToken
+            # Spotify app credentials for LavaSrc. Optional secret; without it Spotify links fail.
+            - name: SPOTIFY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: lavalink-spotify
+                  key: clientId
+                  optional: true
+            - name: SPOTIFY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: lavalink-spotify
+                  key: clientSecret
+                  optional: true
           volumeMounts:
             - name: config
               mountPath: /opt/Lavalink/application.yml
