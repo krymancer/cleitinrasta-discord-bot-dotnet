@@ -27,6 +27,9 @@ var builder = Host.CreateDefaultBuilder(args)
         services.Configure<PlayerOptions>(context.Configuration.GetSection(PlayerOptions.SectionName));
         services.AddSingleton<MusicQueryHistory>();
         services.AddSingleton<MusicPlaybackService>();
+        services.AddSingleton<AutoplayService>();
+        services.AddSingleton<NowPlayingPanel>();
+        services.AddHostedService<NowPlayingRefresher>();
         services.Configure<MeetOptions>(context.Configuration.GetSection(MeetOptions.SectionName));
         services.AddSingleton<MeetingService>();
 
@@ -79,7 +82,7 @@ var builder = Host.CreateDefaultBuilder(args)
             options.Threshold = 1;
         });
     })
-    .UseApplicationCommands<SlashCommandInteraction, SlashCommandContext>()
+    .UseApplicationCommands<SlashCommandInteraction, SlashCommandContext, AutocompleteInteractionContext>()
     .UseApplicationCommands<UserCommandInteraction, UserCommandContext>()
     .UseApplicationCommands<MessageCommandInteraction, MessageCommandContext>()
     .UseComponentInteractions<ButtonInteraction, ButtonInteractionContext>();

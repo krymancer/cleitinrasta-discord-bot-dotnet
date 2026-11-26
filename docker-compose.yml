@@ -18,15 +18,20 @@ services:
       start_period: 20s
 
   lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4
+    build:
+      context: .
+      dockerfile: docker/lavalink/Dockerfile
+    image: ghcr.io/krymancer/cleitinrasta-lavalink:yt-pr229
     container_name: lavalink
     restart: unless-stopped
     depends_on:
       webpo:
         condition: service_healthy
+    environment:
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
     volumes:
       - ./LavaLink/application.yml:/opt/Lavalink/application.yml:ro
-      - ./third_party/youtube-plugin-pr229-1ddb648.jar:/opt/Lavalink/plugins/youtube-plugin.jar:ro
     networks:
       - bot-network
     healthcheck:

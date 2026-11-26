@@ -23,7 +23,29 @@ plugins:
       - WEB
       - TVHTML5_SIMPLY
       - TV
+  lavasrc:
+    # Spotify links are resolved to metadata, then played from YouTube.
+    providers:
+      - "ytsearch:\"%ISRC%\""
+      - "ytsearch:%QUERY%"
+    sources:
+      spotify: true
+      applemusic: false
+      deezer: false
+      yandexmusic: false
+    spotify:
+      # Required for Spotify links: Spotify's anonymous token endpoint no longer works.
+      # Create an app at https://developer.spotify.com/dashboard. Empty = Spotify links fail.
+      clientId: "${SPOTIFY_CLIENT_ID:}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET:}"
+      countryCode: "BR"
+      playlistLoadLimit: 6
+      albumLoadLimit: 6
+      resolveArtistsInSearch: false
 lavalink:
+  plugins:
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
+      repository: "https://maven.lavalink.dev/releases"
   server:
     password: "youshallnotpass"
     sources:

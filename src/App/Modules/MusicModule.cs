@@ -1,7 +1,4 @@
 ﻿using App.Services;
-using Lavalink4NET;
-using Lavalink4NET.NetCord;
-using Lavalink4NET.Players;
 using Lavalink4NET.Players.Queued;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
@@ -9,154 +6,67 @@ using NetCord.Services.ApplicationCommands;
 namespace App.Modules;
 
 public class MusicModule(
-    IAudioService audioService,
     MusicPlaybackService playbackService,
-    MusicQueryHistory history) : ApplicationCommandModule<SlashCommandContext>
+    MusicQueryHistory history,
+    NowPlayingPanel panel) : ApplicationCommandModule<SlashCommandContext>
 {
-    [SlashCommand("play", "Plays a track!")]
-    public async Task PlayAsync([SlashCommandParameter(Description = "The query to search for")] string query)
+    [SlashCommand("play", "Play a song or playlist (search, YouTube or Spotify link)")]
+    public async Task PlayAsync(
+        [SlashCommandParameter(Description = "Song name or link", AutocompleteProviderType = typeof(PlayQueryAutocomplete))]
+        string query)
     {
         await Context.Interaction.SendResponseAsync(InteractionCallback.DeferredMessage());
 
-        var message = await playbackService.PlayAsync(Context, query);
+        var result = await playbackService.PlayAsync(Context, Context.Channel.Id, Context.User.Id, query);
+        if (result.Player is not null)
+            await panel.RefreshAsync(result.Player);
 
-        await Context.Interaction.SendFollowupMessageAsync(MusicMessageFactory.Plain(message));
+        await Context.Interaction.SendFollowupMessageAsync(MusicMessageFactory.Plain(result.Message));
     }
 
-    [SlashCommand("clear", description: "Clears the queue and stops playback")]
-    public async Task<string> Clear()
+    [SlashCommand("nowplaying", "Show the Now Playing panel at the bottom of the chat")]
+    public async Task NowPlayingAsync()
     {
-        return await playbackService.ClearAsync(Context);
-    }
-
-    [SlashCommand("history", description: "Shows the last played queries")]
-    public InteractionMessageProperties History()
-    {
-        var entries = history.GetLatest();
-
-        return MusicMessageFactory.History(entries);
-    }
-
-    [SlashCommand("stop", description: "Stops the current track")]
-    public async Task<string> Stop()
-    {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        if (player.CurrentTrack is null) return ("Nothing playing!");
-
-        await player.StopAsync();
-        return "Stopped playing.";
-    }
-
-    [SlashCommand("position", description: "Shows the track position")]
-    public async Task<string> Position()
-    {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        if (player.CurrentTrack is null) return "Nothing playing!";
-
-        return $"Position: {player.Position?.Position} / {player.CurrentTrack.Duration}.";
-    }
-
-    [SlashCommand("pause", description: "Pauses the player.")]
-    public async Task<string> PauseAsync()
-    {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        if (player.State is PlayerState.Paused)
+        var result = await playbackService.GetPlayerAsync(Context);
+        if (result.Player is null)
         {
-            return "Player is already paused.";
+            await RespondAsync(result.Message, ephemeral: true);
+            return;
         }
 
-        await player.PauseAsync();
-        return "Paused.";
+        result.Player.TextChannelId = Context.Channel.Id;
+        await RespondAsync("🎶 Here you go:", ephemeral: true);
+        await panel.PostAsync(result.Player);
     }
 
-    [SlashCommand("resume", description: "Resumes the player.")]
-    public async Task<string> ResumeAsync()
+    [SlashCommand("pause", "Pause the current song")]
+    public Task PauseAsync() => RunAsync(playbackService.PauseAsync(Context));
+
+    [SlashCommand("resume", "Resume playback (also restarts the queue after /stop)")]
+    public Task ResumeAsync() => RunAsync(playbackService.ResumeAsync(Context));
+
+    [SlashCommand("skip", "Skip the current song")]
+    public Task SkipAsync() => RunAsync(playbackService.SkipAsync(Context), refreshPanel: false);
+
+    [SlashCommand("stop", "Stop the current song but keep the queue")]
+    public Task StopAsync() => RunAsync(playbackService.StopAsync(Context));
+
+    [SlashCommand("clear", "Clear the queue and stop playback")]
+    public Task ClearAsync() => RunAsync(playbackService.ClearAsync(Context));
+
+    [SlashCommand("loop", "Loop the current song or the whole queue")]
+    public Task LoopAsync(
+        [SlashCommandParameter(Description = "What to loop (default: cycle Off → Track → Queue)")] LoopMode? mode = null)
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        if (player.State is not PlayerState.Paused) return "Player is not paused.";
-
-        await player.ResumeAsync();
-        return "Resumed.";
-    }
-
-
-    [SlashCommand("skip", description: "Skips the current track")]
-    public async Task<string> Skip()
-    {
-        return await playbackService.SkipAsync(Context);
-    }
-
-    [SlashCommand("queue", description: "Show the queue")]
-    public async Task<InteractionMessageProperties> Queue()
-    {
-        var queue = await playbackService.GetQueueAsync(Context);
-
-        return MusicMessageFactory.Queue(queue);
-    }
-
-    [SlashCommand("loop", description: "Loops the current track, or the whole queue")]
-    public async Task<string> Loop(
-        [SlashCommandParameter(Description = "What to loop (default: track)")] LoopMode? mode = null)
-    {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        // No parameter: toggle track loop on/off
-        var repeatMode = mode switch
+        TrackRepeatMode? repeatMode = mode switch
         {
             LoopMode.Track => TrackRepeatMode.Track,
             LoopMode.Queue => TrackRepeatMode.Queue,
             LoopMode.Off => TrackRepeatMode.None,
-            null => player.RepeatMode is TrackRepeatMode.Track ? TrackRepeatMode.None : TrackRepeatMode.Track,
-            _ => TrackRepeatMode.None,
+            _ => null,
         };
 
-        player.RepeatMode = repeatMode;
-
-        return repeatMode switch
-        {
-            TrackRepeatMode.Track => "Looping current track. 🔂",
-            TrackRepeatMode.Queue => "Looping the whole queue. 🔁",
-            _ => "Loop disabled.",
-        };
+        return RunAsync(playbackService.SetLoopAsync(Context, repeatMode));
     }
 
     public enum LoopMode
@@ -166,45 +76,36 @@ public class MusicModule(
         Off,
     }
 
-    [SlashCommand("shuffle", "Toggles shuffle mode")]
-    public async Task<string> Shuffle()
+    [SlashCommand("shuffle", "Toggle shuffle")]
+    public Task ShuffleAsync() => RunAsync(playbackService.ToggleShuffleAsync(Context));
+
+    [SlashCommand("autoplay", "Toggle autoplay: keep playing similar songs when the queue ends")]
+    public Task AutoplayAsync() => RunAsync(playbackService.ToggleAutoplayAsync(Context));
+
+    [SlashCommand("queue", "Show the queue")]
+    public async Task<InteractionMessageProperties> QueueAsync()
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
-
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
-
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        player.Shuffle = !player.Shuffle;
-
-        return player.Shuffle ? "Shuffle enabled." : "Shuffle disabled.";
+        var queue = await playbackService.GetQueueAsync(Context);
+        return MusicMessageFactory.Queue(queue);
     }
 
-    [SlashCommand("leave", description: "Disconnects the bot from the voice channel")]
-    public async Task<string> LeaveAsync()
+    [SlashCommand("history", "Show recently played searches")]
+    public InteractionMessageProperties History() => MusicMessageFactory.History(history.GetLatest());
+
+    [SlashCommand("leave", "Disconnect the bot from the voice channel")]
+    public Task LeaveAsync() => RunAsync(playbackService.LeaveAsync(Context), refreshPanel: false);
+
+    private async Task RunAsync(Task<MusicResult> action, bool refreshPanel = true)
     {
-        var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: PlayerChannelBehavior.None);
+        var result = await action;
 
-        var result = await audioService.Players
-            .RetrieveAsync(Context, playerFactory: PlayerFactory.Queued, retrieveOptions);
+        // Answer first: Discord only waits 3 seconds for the interaction response.
+        await RespondAsync(result.Message, ephemeral: !result.IsSuccess);
 
-        if (!result.IsSuccess) return GetErrorMessage(result.Status);
-
-        var player = result.Player;
-
-        // Disconnect and dispose the player
-        await player.DisconnectAsync();
-
-        return "Disconnected from voice channel.";
+        if (refreshPanel && result.Player is not null)
+            await panel.RefreshAsync(result.Player);
     }
 
-    private static string GetErrorMessage(PlayerRetrieveStatus retrieveStatus) => retrieveStatus switch
-    {
-        PlayerRetrieveStatus.UserNotInVoiceChannel => "You are not connected to a voice channel.",
-        PlayerRetrieveStatus.BotNotConnected => "The bot is currently not connected.",
-        _ => "Unknown error.",
-    };
+    private Task RespondAsync(string message, bool ephemeral = false) =>
+        Context.Interaction.SendResponseAsync(InteractionCallback.Message(MusicMessageFactory.Plain(message, ephemeral)));
 }
