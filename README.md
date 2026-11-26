@@ -28,7 +28,7 @@ Playback is driven by a single **Now Playing** panel. It's posted when a song st
 
 | Command | What it does |
 | --- | --- |
-| `/play <query>` | Play or queue a song/playlist. Accepts searches and YouTube or Spotify links; suggests results while you type. |
+| `/play <query>` | Play or queue a song/playlist. Accepts searches, YouTube links/playlists and Spotify track links; suggests results while you type. |
 | `/playnext <query>` | Put a song or playlist at the front of the queue. |
 | `/remove <position>`, `/move <from> <to>` | Edit the queue (positions as shown in `/queue`). |
 | `/seek <time>` | Jump to `1:30`, `90` or `1:02:03`. |
@@ -49,7 +49,7 @@ Playback is driven by a single **Now Playing** panel. It's posted when a song st
 | `/status [check]` | Lavalink version, plugins, YouTube health and recent problems (only you see it). |
 | `/live` | Create a video call room and mention everyone in your voice channel. |
 
-Spotify links are handled by the [LavaSrc](https://github.com/topi314/LavaSrc) Lavalink plugin and played from YouTube. Spotify links need Spotify app credentials (`SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`, see `.env.example`; in k8s the optional `lavalink-spotify` secret with `clientId` / `clientSecret`).
+Spotify links are handled by the [LavaSrc](https://github.com/topi314/LavaSrc) Lavalink plugin and played from YouTube. Spotify links need Spotify app credentials (`SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`, see `.env.example`; in k8s the optional `lavalink-spotify` secret with `clientId` / `clientSecret`). Only single Spotify tracks work: Spotify refuses albums and playlists for new development-mode apps ([LavaSrc #358](https://github.com/topi314/LavaSrc/issues/358)), so use YouTube playlists for those.
 
 ### Data and restarts
 
