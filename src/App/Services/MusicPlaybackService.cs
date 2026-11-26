@@ -15,7 +15,10 @@ public sealed record MusicResult(string Message, MusicPlayer? Player = null)
     public bool IsSuccess => Player is not null;
 }
 
-public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryHistory history)
+public sealed class MusicPlaybackService(
+    IAudioService audioService,
+    MusicQueryHistory history,
+    AlertService alerts)
 {
     public async Task<MusicResult> PlayAsync(IGuildContext context, ulong textChannelId, ulong userId, string query, bool next = false)
     {
@@ -57,6 +60,13 @@ public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryH
         }
 
         var track = tracksResult.Track;
+
+        if (tracksResult.IsFailed)
+        {
+            await alerts.ReportAsync("search-failed", "Loading a song failed",
+                $"`/play {MusicMessageFactory.Truncate(query, 200)}`\n\n`{MusicMessageFactory.Truncate(tracksResult.Exception?.Cause ?? tracksResult.Exception?.Message ?? "unknown error", 900)}`");
+        }
+
         if (track is null)
         {
             if (tracksResult.IsFailed && query.Contains("spotify.com", StringComparison.OrdinalIgnoreCase))
