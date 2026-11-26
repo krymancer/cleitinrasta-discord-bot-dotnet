@@ -3,6 +3,7 @@ using Lavalink4NET.NetCord;
 using Lavalink4NET.Players;
 using Lavalink4NET.Players.Queued;
 using Lavalink4NET.Rest.Entities.Tracks;
+using Lavalink4NET.Tracks;
 using Microsoft.Extensions.Options;
 using NetCord.Services;
 
@@ -16,7 +17,7 @@ public sealed record MusicResult(string Message, MusicPlayer? Player = null)
 
 public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryHistory history)
 {
-    public async Task<MusicResult> PlayAsync(IGuildContext context, ulong textChannelId, ulong userId, string query)
+    public async Task<MusicResult> PlayAsync(IGuildContext context, ulong textChannelId, ulong userId, string query, bool next = false)
     {
         var result = await RetrieveAsync(context, textChannelId, join: true);
         if (!result.IsSuccess)
@@ -36,7 +37,10 @@ public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryH
                 .Select(track => (ITrackQueueItem)new MusicQueueItem(new TrackReference(track), userId))
                 .ToArray();
 
-            await player.Queue.AddRangeAsync(items);
+            if (next)
+                await player.Queue.InsertRangeAsync(0, items);
+            else
+                await player.Queue.AddRangeAsync(items);
 
             if (player.CurrentTrack is null)
                 await player.SkipAsync();
@@ -47,7 +51,9 @@ public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryH
                 ? $" from **{MusicMessageFactory.Escape(playlistName)}**"
                 : string.Empty;
 
-            return new MusicResult($"📃 Added {MusicMessageFactory.Tracks(tracksResult.Tracks.Length)}{name} to the queue.", player);
+            return new MusicResult(next
+                ? $"📃 Added {MusicMessageFactory.Tracks(tracksResult.Tracks.Length)}{name} to the front of the queue."
+                : $"📃 Added {MusicMessageFactory.Tracks(tracksResult.Tracks.Length)}{name} to the queue.", player);
         }
 
         var track = tracksResult.Track;
@@ -65,7 +71,17 @@ public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryH
                 : "No tracks found.", player);
         }
 
-        var position = await player.PlayAsync(new MusicQueueItem(new TrackReference(track), userId));
+        var item = new MusicQueueItem(new TrackReference(track), userId);
+        int position;
+        if (next && player.CurrentTrack is not null)
+        {
+            await player.Queue.InsertAsync(0, item);
+            position = 1;
+        }
+        else
+        {
+            position = await player.PlayAsync(item);
+        }
 
         history.Add(query, track.Title, 1);
 
@@ -242,6 +258,132 @@ public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryH
         return new MusicResult("👋 Disconnected from the voice channel.", player);
     }
 
+    public async Task<MusicResult> RemoveAsync(IGuildContext context, int position)
+    {
+        var (player, error) = await GetAsync(context);
+        if (player is null) return error!;
+
+        if (position < 1 || position > player.Queue.Count)
+            return new MusicResult(QueueRangeError(player, "remove"), player);
+
+        var item = player.Queue[position - 1];
+        await player.Queue.RemoveAtAsync(position - 1);
+
+        return new MusicResult($"🗑 Removed **{MusicMessageFactory.Escape(Title(item))}** from the queue.", player);
+    }
+
+    public async Task<MusicResult> MoveAsync(IGuildContext context, int from, int to)
+    {
+        var (player, error) = await GetAsync(context);
+        if (player is null) return error!;
+
+        var count = player.Queue.Count;
+        if (from < 1 || from > count || to < 1 || to > count)
+            return new MusicResult(QueueRangeError(player, "move"), player);
+
+        var item = player.Queue[from - 1];
+        await player.Queue.RemoveAtAsync(from - 1);
+        await player.Queue.InsertAsync(to - 1, item);
+
+        return new MusicResult($"↕ Moved **{MusicMessageFactory.Escape(Title(item))}** to position {to}.", player);
+    }
+
+    public async Task<MusicResult> SeekAsync(IGuildContext context, string time)
+    {
+        var (player, error) = await GetAsync(context);
+        if (player is null) return error!;
+
+        var track = player.CurrentTrack;
+        if (track is null) return new MusicResult("Nothing is playing.", player);
+        if (!track.IsSeekable) return new MusicResult("This track can't be seeked (live stream?).", player);
+
+        if (!TryParseTime(time, out var position))
+            return new MusicResult("Use a time like `1:30`, `90` or `1:02:03`.", player);
+
+        if (position >= track.Duration)
+            return new MusicResult($"That's past the end of the song ({MusicMessageFactory.FormatTime(track.Duration)}).", player);
+
+        await player.SeekAsync(position);
+        return new MusicResult($"⏩ Jumped to {MusicMessageFactory.FormatTime(position)}.", player);
+    }
+
+    public async Task<MusicResult> SetVolumeAsync(IGuildContext context, int? percent)
+    {
+        var (player, error) = await GetAsync(context);
+        if (player is null) return error!;
+
+        if (percent is null)
+            return new MusicResult($"🔊 Volume is {Math.Round(player.Volume * 100)}%.", player);
+
+        var clamped = Math.Clamp(percent.Value, 0, 200);
+        await player.SetVolumeAsync(clamped / 100f);
+        return new MusicResult($"🔊 Volume set to {clamped}%.", player);
+    }
+
+    /// <summary>Queues already-resolved tracks (saved playlists).</summary>
+    public async Task<MusicResult> EnqueueAsync(IGuildContext context, ulong textChannelId, ulong userId, IReadOnlyList<LavalinkTrack> tracks, bool shuffle)
+    {
+        var result = await RetrieveAsync(context, textChannelId, join: true);
+        if (!result.IsSuccess)
+            return new MusicResult(GetErrorMessage(result.Status));
+
+        var player = result.Player;
+        player.TextChannelId = textChannelId;
+
+        var items = tracks
+            .Select(track => (ITrackQueueItem)new MusicQueueItem(new TrackReference(track), userId))
+            .ToList();
+
+        if (shuffle)
+            items = items.OrderBy(_ => Random.Shared.Next()).ToList();
+
+        await player.Queue.AddRangeAsync(items);
+
+        if (player.CurrentTrack is null)
+            await player.SkipAsync();
+
+        return new MusicResult($"📃 Added {MusicMessageFactory.Tracks(items.Count)} to the queue.", player);
+    }
+
+    /// <summary>The current track followed by the queue, for saving as a playlist.</summary>
+    public async Task<(IReadOnlyList<LavalinkTrack> Tracks, MusicResult? Error)> GetAllTracksAsync(IGuildContext context)
+    {
+        var (player, error) = await GetAsync(context);
+        if (player is null) return ([], error);
+
+        var tracks = new List<LavalinkTrack>();
+        if (player.CurrentTrack is not null)
+            tracks.Add(player.CurrentTrack);
+
+        tracks.AddRange(player.Queue.Select(item => item.Track).OfType<LavalinkTrack>());
+        return (tracks, null);
+    }
+
+    public static bool TryParseTime(string input, out TimeSpan time)
+    {
+        time = TimeSpan.Zero;
+        var parts = input.Trim().Split(':');
+        if (parts.Length is < 1 or > 3)
+            return false;
+
+        var seconds = 0;
+        foreach (var part in parts)
+        {
+            if (!int.TryParse(part, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value))
+                return false;
+            seconds = seconds * 60 + value;
+        }
+
+        time = TimeSpan.FromSeconds(seconds);
+        return true;
+    }
+
+    private static string QueueRangeError(MusicPlayer player, string verb) => player.Queue.IsEmpty
+        ? "The queue is empty."
+        : $"Pick a position between 1 and {player.Queue.Count} to {verb} (see `/queue`).";
+
+    private static string Title(ITrackQueueItem item) => item.Track?.Title ?? item.Identifier;
+
     public async Task<MusicResult> GetPlayerAsync(IGuildContext context)
     {
         var (player, error) = await GetAsync(context);
@@ -279,17 +421,7 @@ public sealed class MusicPlaybackService(IAudioService audioService, MusicQueryH
         var retrieveOptions = new PlayerRetrieveOptions(
             ChannelBehavior: join ? PlayerChannelBehavior.Join : PlayerChannelBehavior.None);
 
-        var options = Options.Create(new MusicPlayerOptions
-        {
-            TextChannelId = textChannelId,
-            SelfDeaf = true,
-            // /stop keeps the queue; /clear empties it.
-            ClearQueueOnStop = false,
-            // Loop/shuffle are settings, not per-track state: keep them across stops.
-            ResetTrackRepeatOnStop = false,
-            ResetShuffleOnStop = false,
-            HistoryCapacity = 50,
-        });
+        var options = Options.Create(MusicPlayer.CreateOptions(textChannelId));
 
         return audioService.Players.RetrieveAsync(context, MusicPlayer.Factory, options, retrieveOptions);
     }

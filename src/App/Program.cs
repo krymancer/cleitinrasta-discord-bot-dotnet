@@ -25,6 +25,12 @@ var builder = Host.CreateDefaultBuilder(args)
         // Bind configuration sections to strongly-typed options
         services.Configure<LavalinkOptions>(context.Configuration.GetSection(LavalinkOptions.SectionName));
         services.Configure<PlayerOptions>(context.Configuration.GetSection(PlayerOptions.SectionName));
+        services.Configure<StorageOptions>(context.Configuration.GetSection(StorageOptions.SectionName));
+        services.AddSingleton<BotDatabase>();
+        services.AddSingleton<PlaylistStore>();
+        services.AddSingleton<LyricsService>();
+        services.AddSingleton<PlayerSessionService>();
+        services.AddHostedService(provider => provider.GetRequiredService<PlayerSessionService>());
         services.AddSingleton<MusicQueryHistory>();
         services.AddSingleton<MusicPlaybackService>();
         services.AddSingleton<AutoplayService>();

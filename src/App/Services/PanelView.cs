@@ -23,6 +23,7 @@ public sealed record PanelView(
     TrackRepeatMode RepeatMode,
     bool Shuffle,
     bool Autoplay,
+    int VolumePercent,
     bool CanGoBack)
 {
     public bool HasTrack => Title is not null;
@@ -52,6 +53,7 @@ public sealed record PanelView(
             RepeatMode: player.RepeatMode,
             Shuffle: player.Shuffle,
             Autoplay: player.Autoplay,
+            VolumePercent: (int)Math.Round(player.Volume * 100),
             CanGoBack: player.Queue.HasHistory && player.Queue.History.Count > 0);
     }
 }

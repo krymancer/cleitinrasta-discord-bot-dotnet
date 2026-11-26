@@ -8,7 +8,8 @@ namespace App.Modules;
 public class MusicModule(
     MusicPlaybackService playbackService,
     MusicQueryHistory history,
-    NowPlayingPanel panel) : ApplicationCommandModule<SlashCommandContext>
+    NowPlayingPanel panel,
+    LyricsService lyricsService) : ApplicationCommandModule<SlashCommandContext>
 {
     [SlashCommand("play", "Play a song or playlist (search, YouTube or Spotify link)")]
     public async Task PlayAsync(
@@ -22,6 +23,74 @@ public class MusicModule(
             await panel.RefreshAsync(result.Player);
 
         await Context.Interaction.SendFollowupMessageAsync(MusicMessageFactory.Plain(result.Message));
+    }
+
+    [SlashCommand("playnext", "Put a song or playlist at the front of the queue")]
+    public async Task PlayNextAsync(
+        [SlashCommandParameter(Description = "Song name or link", AutocompleteProviderType = typeof(PlayQueryAutocomplete))]
+        string query)
+    {
+        await Context.Interaction.SendResponseAsync(InteractionCallback.DeferredMessage());
+
+        var result = await playbackService.PlayAsync(Context, Context.Channel.Id, Context.User.Id, query, next: true);
+        if (result.Player is not null)
+            await panel.RefreshAsync(result.Player);
+
+        await Context.Interaction.SendFollowupMessageAsync(MusicMessageFactory.Plain(result.Message));
+    }
+
+    [SlashCommand("remove", "Remove a song from the queue")]
+    public Task RemoveAsync(
+        [SlashCommandParameter(Description = "Position in /queue", MinValue = 1)] int position) =>
+        RunAsync(playbackService.RemoveAsync(Context, position));
+
+    [SlashCommand("move", "Move a song to another position in the queue")]
+    public Task MoveAsync(
+        [SlashCommandParameter(Description = "Current position in /queue", MinValue = 1)] int from,
+        [SlashCommandParameter(Description = "New position (1 = next)", MinValue = 1)] int to) =>
+        RunAsync(playbackService.MoveAsync(Context, from, to));
+
+    [SlashCommand("seek", "Jump to a time in the current song")]
+    public Task SeekAsync(
+        [SlashCommandParameter(Description = "Like 1:30, 90 or 1:02:03")] string time) =>
+        RunAsync(playbackService.SeekAsync(Context, time));
+
+    [SlashCommand("volume", "Show or set the volume")]
+    public Task VolumeAsync(
+        [SlashCommandParameter(Description = "0-200 (100 = normal)", MinValue = 0, MaxValue = 200)] int? percent = null) =>
+        RunAsync(playbackService.SetVolumeAsync(Context, percent));
+
+    [SlashCommand("lyrics", "Show the lyrics of the current song (or search)")]
+    public async Task LyricsAsync(
+        [SlashCommandParameter(Description = "Song to look up (default: what's playing)")] string? song = null)
+    {
+        await Context.Interaction.SendResponseAsync(InteractionCallback.DeferredMessage());
+
+        string title;
+        string? author = null;
+        TimeSpan? duration = null;
+
+        if (!string.IsNullOrWhiteSpace(song))
+        {
+            title = song;
+        }
+        else
+        {
+            var current = (await playbackService.GetPlayerAsync(Context)).Player?.CurrentTrack;
+            if (current is null)
+            {
+                await Context.Interaction.SendFollowupMessageAsync(
+                    MusicMessageFactory.Plain("Nothing is playing. Use `/lyrics song:<name>` to search."));
+                return;
+            }
+
+            (title, author, duration) = (current.Title, current.Author, current.Duration);
+        }
+
+        var lyrics = await lyricsService.FindAsync(title, author, duration);
+        await Context.Interaction.SendFollowupMessageAsync(lyrics is null
+            ? MusicMessageFactory.Plain($"No lyrics found for **{MusicMessageFactory.Escape(LyricsService.CleanTitle(title))}**.")
+            : MusicMessageFactory.Lyrics(lyrics));
     }
 
     [SlashCommand("nowplaying", "Show the Now Playing panel at the bottom of the chat")]

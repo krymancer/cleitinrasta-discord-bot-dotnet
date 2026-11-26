@@ -124,7 +124,7 @@ public static class MusicMessageFactory
             _ => "Off",
         };
 
-        return $"Loop: {loop}  •  Shuffle: {OnOff(view.Shuffle)}  •  Autoplay: {OnOff(view.Autoplay)}";
+        return $"Loop: {loop}  •  Shuffle: {OnOff(view.Shuffle)}  •  Autoplay: {OnOff(view.Autoplay)}  •  Volume: {view.VolumePercent}%";
     }
 
     private static IMessageComponentProperties[] CreatePanelControls(PanelView view)
@@ -166,6 +166,43 @@ public static class MusicMessageFactory
         var knob = (int)Math.Round(ratio * (width - 1));
 
         return string.Concat(Enumerable.Range(0, width).Select(i => i == knob ? "🔘" : "▬"));
+    }
+
+    // ---- Lyrics -----------------------------------------------------------------------
+
+    public static InteractionMessageProperties Lyrics(Lyrics lyrics)
+    {
+        // Embed descriptions max out at 4096 characters and a message at 6000 in total.
+        const int PageSize = 4000;
+        const int TotalBudget = 5600;
+
+        var text = lyrics.Text.Length > TotalBudget
+            ? lyrics.Text[..TotalBudget].TrimEnd() + "\n…"
+            : lyrics.Text;
+
+        var pages = new List<string>();
+        var remaining = text;
+        while (remaining.Length > 0)
+        {
+            var take = remaining.Length <= PageSize ? remaining.Length : remaining.LastIndexOf('\n', PageSize);
+            if (take <= 0) take = Math.Min(PageSize, remaining.Length);
+            pages.Add(remaining[..take]);
+            remaining = remaining[take..].TrimStart('\n');
+        }
+
+        var embeds = pages.Select((page, index) =>
+        {
+            var embed = new EmbedProperties().WithDescription(page).WithColor(new Color(0xE91E63));
+            if (index == 0)
+                embed.WithTitle(Truncate($"🎤 {lyrics.TrackName} — {lyrics.ArtistName}", 256));
+            if (index == pages.Count - 1)
+                embed.WithFooter(new EmbedFooterProperties().WithText("Lyrics from lrclib.net"));
+            return embed;
+        });
+
+        return new InteractionMessageProperties()
+            .AddEmbeds(embeds)
+            .WithAllowedMentions(AllowedMentionsProperties.None);
     }
 
     // ---- History ----------------------------------------------------------------------

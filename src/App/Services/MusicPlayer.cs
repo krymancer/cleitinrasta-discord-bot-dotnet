@@ -2,6 +2,7 @@ using Lavalink4NET.Extensions;
 using Lavalink4NET.Players;
 using Lavalink4NET.Players.Queued;
 using Lavalink4NET.Protocol.Payloads.Events;
+using Lavalink4NET.Tracks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -16,7 +17,10 @@ public sealed record MusicPlayerOptions : QueuedLavalinkPlayerOptions
 /// A queue item that remembers who asked for it. <see cref="RequesterId"/> is <c>null</c>
 /// for tracks the bot added on its own (autoplay).
 /// </summary>
-public sealed record MusicQueueItem(TrackReference Reference, ulong? RequesterId) : ITrackQueueItem;
+public sealed record MusicQueueItem(TrackReference Reference, ulong? RequesterId) : ITrackQueueItem
+{
+    public LavalinkTrack? Track => Reference.Track;
+}
 
 /// <summary>
 /// Queued player that keeps the Now Playing panel in sync and tops the queue up
@@ -27,7 +31,20 @@ public sealed class MusicPlayer : QueuedLavalinkPlayer
     public static PlayerFactory<MusicPlayer, MusicPlayerOptions> Factory { get; } =
         PlayerFactory.Create<MusicPlayer, MusicPlayerOptions>(properties => new MusicPlayer(properties));
 
+    public static MusicPlayerOptions CreateOptions(ulong textChannelId) => new()
+    {
+        TextChannelId = textChannelId,
+        SelfDeaf = true,
+        // /stop keeps the queue; /clear empties it.
+        ClearQueueOnStop = false,
+        // Loop/shuffle are settings, not per-track state: keep them across stops.
+        ResetTrackRepeatOnStop = false,
+        ResetShuffleOnStop = false,
+        HistoryCapacity = 50,
+    };
+
     private readonly NowPlayingPanel? _panel;
+    private readonly PlayerSessionService? _sessions;
     private readonly AutoplayService? _autoplay;
     private readonly ILogger _logger;
 
@@ -37,6 +54,7 @@ public sealed class MusicPlayer : QueuedLavalinkPlayer
         TextChannelId = properties.Options.Value.TextChannelId;
         _panel = properties.ServiceProvider?.GetService<NowPlayingPanel>();
         _autoplay = properties.ServiceProvider?.GetService<AutoplayService>();
+        _sessions = properties.ServiceProvider?.GetService<PlayerSessionService>();
         _logger = properties.Logger;
     }
 
@@ -82,6 +100,8 @@ public sealed class MusicPlayer : QueuedLavalinkPlayer
     {
         if (_panel is not null)
             await RunSafeAsync(() => _panel.RemoveAsync(GuildId), "remove the Now Playing panel");
+
+        _sessions?.Forget(GuildId);
 
         await base.DisposeAsyncCore();
     }

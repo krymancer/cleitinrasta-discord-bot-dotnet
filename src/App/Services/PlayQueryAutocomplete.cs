@@ -45,15 +45,9 @@ public sealed class PlayQueryAutocomplete(
             return choices;
         }
 
-        foreach (var entry in history.GetLatest())
-        {
-            if (input.Length == 0
-                || entry.FirstTrackTitle.Contains(input, StringComparison.OrdinalIgnoreCase)
-                || entry.Query.Contains(input, StringComparison.OrdinalIgnoreCase))
-            {
-                Add($"🕘 {entry.FirstTrackTitle}", entry.Query);
-            }
-        }
+        var recent = input.Length == 0 ? history.GetLatest(10) : history.Search(input, 5);
+        foreach (var entry in recent)
+            Add($"🕘 {entry.FirstTrackTitle}", entry.Query);
 
         if (input.Length < 2)
             return choices;
