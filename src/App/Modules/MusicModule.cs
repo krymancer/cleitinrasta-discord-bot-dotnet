@@ -10,7 +10,7 @@ public class MusicModule(
     MusicQueryHistory history,
     NowPlayingPanel panel) : ApplicationCommandModule<SlashCommandContext>
 {
-    [SlashCommand("play", "Play a song or playlist (YouTube, Spotify, SoundCloud links or a search)")]
+    [SlashCommand("play", "Play a song or playlist (search, YouTube or Spotify link)")]
     public async Task PlayAsync(
         [SlashCommandParameter(Description = "Song name or link", AutocompleteProviderType = typeof(PlayQueryAutocomplete))]
         string query)

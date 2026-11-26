@@ -28,7 +28,7 @@ Playback is driven by a single **Now Playing** panel. It's posted when a song st
 
 | Command | What it does |
 | --- | --- |
-| `/play <query>` | Play or queue a song/playlist. Accepts searches and YouTube, Spotify or SoundCloud links; suggests results while you type. |
+| `/play <query>` | Play or queue a song/playlist. Accepts searches and YouTube or Spotify links; suggests results while you type. |
 | `/pause`, `/resume` | Pause / resume. `/resume` after `/stop` restarts the queue. |
 | `/skip` | Skip the current song. |
 | `/stop` | Stop the current song but **keep** the queue. |
