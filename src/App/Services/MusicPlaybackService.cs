@@ -71,8 +71,15 @@ public sealed class MusicPlaybackService(
         {
             if (tracksResult.IsFailed && query.Contains("spotify.com", StringComparison.OrdinalIgnoreCase))
             {
-                return new MusicResult(
-                    "Couldn't load that Spotify link. Spotify needs `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` set on Lavalink (see README).",
+                // Spotify only serves single tracks to development-mode apps: albums (403) and
+                // playlists (401, needs a logged-in user) fail. See LavaSrc issue #358.
+                var isCollection = query.Contains("/album/", StringComparison.OrdinalIgnoreCase)
+                    || query.Contains("/playlist/", StringComparison.OrdinalIgnoreCase)
+                    || query.Contains("/artist/", StringComparison.OrdinalIgnoreCase);
+
+                return new MusicResult(isCollection
+                    ? "Spotify albums and playlists can't be loaded (Spotify blocks them for bot apps). Single Spotify songs work — or use a YouTube playlist."
+                    : "Couldn't load that Spotify link. If no Spotify songs work, check `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` on Lavalink (see README).",
                     player);
             }
 
